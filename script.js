@@ -3,23 +3,42 @@ const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 
+// Paste your Worker address between the quotes, starting with https://
+const WORKER_URL = "kurama-ai-backend.harshithuppu329.workers.dev";
+
 function addMessage(text, who) {
   const div = document.createElement("div");
   div.className = "msg " + who;
   div.textContent = text;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
+  return div;
 }
 
-function sendMessage() {
+async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
+
   addMessage(text, "user");
   input.value = "";
-  // Placeholder reply. In Phase 2 this becomes the real AI brain.
-  setTimeout(() => {
-    addMessage("AI brain not connected yet. Coming in Phase 2!", "kurama");
-  }, 600);
+  sendBtn.disabled = true;
+
+  const thinking = addMessage("Kurama is thinking...", "kurama");
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await res.json();
+    thinking.textContent = data.reply || "Kurama couldn't answer. Try again.";
+  } catch (e) {
+    thinking.textContent = "Can't reach Kurama's brain. Check your internet.";
+  }
+
+  sendBtn.disabled = false;
+  chat.scrollTop = chat.scrollHeight;
 }
 
 sendBtn.addEventListener("click", sendMessage);
