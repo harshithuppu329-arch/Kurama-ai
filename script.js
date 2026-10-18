@@ -280,24 +280,11 @@ function handlePhoneAction(text) {
     };
   }
 
-  // alarm (may not work on every phone)
-  m = t.replace(/\./g, "").match(/^set (?:an )?alarm (?:for|at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
-  if (m) {
-    let h = parseInt(m[1], 10);
-    const mi = m[2] ? parseInt(m[2], 10) : 0;
-    const ap = m[3] ? m[3].toLowerCase() : "";
-    if (ap === "pm" && h < 12) h += 12;
-    if (ap === "am" && h === 12) h = 0;
-    if (h > 23 || mi > 59) return { text: "That time doesn't look right. Try 'set alarm for 6:30 am'." };
-    const pad = (n) => String(n).padStart(2, "0");
+    // alarm: Android doesn't let web apps set alarms
+  if (/^set (?:an )?alarm/i.test(t)) {
     return {
-      text: "Alarm for " + pad(h) + ":" + pad(mi) + ". If the button does nothing, open your Clock app instead.",
-      label: "⏰ Set alarm",
-      href:
-        "intent:#Intent;action=android.intent.action.SET_ALARM;" +
-        "i.android.intent.extra.alarm.HOUR=" + h + ";" +
-        "i.android.intent.extra.alarm.MINUTES=" + mi + ";" +
-        "S.android.intent.extra.alarm.MESSAGE=Kurama;end",
+      text:
+        "I can't set alarms from the installed web app, because Android doesn't let websites do that. Please use your Clock app. A native Android version of Kurama could do it later.",
     };
   }
 
