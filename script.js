@@ -5,6 +5,7 @@ const micBtn = document.getElementById("mic");
 
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
+let history = []; // the current conversation, so Kurama remembers it
 
 function addMessage(text, who) {
   const div = document.createElement("div");
@@ -41,13 +42,19 @@ async function sendMessage(fromVoice) {
     const res = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ message: text, history }),
     });
     const data = await res.json();
     thinking.textContent =
       data.reply || "Error: " + (data.error || res.status);
-    // Spoken question gets a spoken answer
-    if (fromVoice && data.reply) speak(data.reply);
+
+    if (data.reply) {
+      // Remember this exchange
+      history.push({ role: "user", text });
+      history.push({ role: "model", text: data.reply });
+      // Spoken question gets a spoken answer
+      if (fromVoice) speak(data.reply);
+    }
   } catch (e) {
     thinking.textContent = "Connection problem: " + e.message;
   }
