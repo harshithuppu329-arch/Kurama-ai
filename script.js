@@ -4,7 +4,7 @@ const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 
 // Paste your Worker address between the quotes, starting with https://
-const WORKER_URL = "kurama-ai-backend.harshithuppu329.workers.dev";
+const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 
 function addMessage(text, who) {
   const div = document.createElement("div");
