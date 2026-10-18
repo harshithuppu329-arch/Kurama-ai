@@ -175,7 +175,6 @@ const PHONE_HELP =
   "• navigate to Charminar\n" +
   "• call 9876543210 or call Mom\n" +
   "• text Mom I'm on my way\n" +
-  "• set alarm for 6:30 am\n" +
   "• save contact Mom 9876543210\n" +
   "• contacts / delete contact Mom";
 
