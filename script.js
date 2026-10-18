@@ -2,10 +2,29 @@ const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
+const newBtn = document.getElementById("newchat");
 
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
-let history = []; // the current conversation, so Kurama remembers it
+const STORE_KEY = "kurama_history_v1";
+
+// Saved on this phone's browser only
+function loadHistory() {
+  try {
+    const h = JSON.parse(localStorage.getItem(STORE_KEY));
+    return Array.isArray(h) ? h : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveHistory() {
+  try {
+    history = history.slice(-40);
+    localStorage.setItem(STORE_KEY, JSON.stringify(history));
+  } catch (e) {}
+}
+
+let history = loadHistory();
 
 function addMessage(text, who) {
   const div = document.createElement("div");
@@ -15,6 +34,11 @@ function addMessage(text, who) {
   chat.scrollTop = chat.scrollHeight;
   return div;
 }
+
+// Show the saved chat when the page opens
+history.forEach((m) =>
+  addMessage(m.text, m.role === "user" ? "user" : "kurama")
+);
 
 // Kurama speaks
 function speak(text) {
@@ -49,10 +73,9 @@ async function sendMessage(fromVoice) {
       data.reply || "Error: " + (data.error || res.status);
 
     if (data.reply) {
-      // Remember this exchange
       history.push({ role: "user", text });
       history.push({ role: "model", text: data.reply });
-      // Spoken question gets a spoken answer
+      saveHistory();
       if (fromVoice) speak(data.reply);
     }
   } catch (e) {
@@ -66,6 +89,16 @@ async function sendMessage(fromVoice) {
 sendBtn.addEventListener("click", () => sendMessage(false));
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage(false);
+});
+
+// New chat clears the saved conversation
+newBtn.addEventListener("click", () => {
+  if (!confirm("Start a new chat? This clears the saved conversation.")) return;
+  history = [];
+  saveHistory();
+  chat.innerHTML = "";
+  window.speechSynthesis.cancel();
+  addMessage("New chat started. What are we doing today?", "kurama");
 });
 
 // You speak
