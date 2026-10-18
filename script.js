@@ -3,11 +3,13 @@ const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 const newBtn = document.getElementById("newchat");
+const modeSel = document.getElementById("mode");
 
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
 const STORE_KEY = "kurama_history_v1";
 const FACTS_KEY = "kurama_facts_v1";
+const MODE_KEY = "kurama_mode_v1";
 const MAX_FACTS = 30;
 
 // ---- Saved on this phone's browser only ----
@@ -33,6 +35,17 @@ function saveFacts() {
 
 let history = loadList(STORE_KEY); // this chat
 let facts = loadList(FACTS_KEY); // long-term notes
+
+// ---- Mode ----
+try {
+  modeSel.value = localStorage.getItem(MODE_KEY) || "chat";
+} catch (e) {}
+if (!modeSel.value) modeSel.value = "chat";
+modeSel.addEventListener("change", () => {
+  try {
+    localStorage.setItem(MODE_KEY, modeSel.value);
+  } catch (e) {}
+});
 
 function addMessage(text, who) {
   const div = document.createElement("div");
@@ -94,11 +107,13 @@ function handleMemoryCommand(text) {
   return null;
 }
 
-// ---- Kurama speaks ----
+// ---- Kurama speaks (code blocks are skipped) ----
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const clean = text.replace(/[*_`#]/g, "");
+  const clean = text
+    .replace(/```[\s\S]*?```/g, " I put the code on your screen. ")
+    .replace(/[*_`#]/g, "");
   const u = new SpeechSynthesisUtterance(clean);
   u.lang = LANG;
   u.rate = 1;
@@ -128,7 +143,12 @@ async function sendMessage(fromVoice) {
     const res = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history, facts }),
+      body: JSON.stringify({
+        message: text,
+        history,
+        facts,
+        mode: modeSel.value,
+      }),
     });
     const data = await res.json();
     thinking.textContent =
