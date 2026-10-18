@@ -3,8 +3,8 @@ const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 
-// Paste your Worker address between the quotes, starting with https://
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
+const LANG = "en-IN"; // speech language
 
 function addMessage(text, who) {
   const div = document.createElement("div");
@@ -15,7 +15,19 @@ function addMessage(text, who) {
   return div;
 }
 
-async function sendMessage() {
+// Kurama speaks
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[*_`#]/g, "");
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = LANG;
+  u.rate = 1;
+  u.pitch = 0.8;
+  window.speechSynthesis.speak(u);
+}
+
+async function sendMessage(fromVoice) {
   const text = input.value.trim();
   if (!text) return;
 
@@ -31,8 +43,11 @@ async function sendMessage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     });
-        const data = await res.json();
-    thinking.textContent = data.reply || ("Error: " + (data.error || res.status));
+    const data = await res.json();
+    thinking.textContent =
+      data.reply || "Error: " + (data.error || res.status);
+    // Spoken question gets a spoken answer
+    if (fromVoice && data.reply) speak(data.reply);
   } catch (e) {
     thinking.textContent = "Connection problem: " + e.message;
   }
@@ -41,12 +56,50 @@ async function sendMessage() {
   chat.scrollTop = chat.scrollHeight;
 }
 
-sendBtn.addEventListener("click", sendMessage);
+sendBtn.addEventListener("click", () => sendMessage(false));
 input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
+  if (e.key === "Enter") sendMessage(false);
 });
 
-// Mic button: glow only for now. Real speech comes in Phase 3.
+// You speak
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let listening = false;
+
+if (SR) {
+  recognition = new SR();
+  recognition.lang = LANG;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    listening = true;
+    micBtn.classList.add("listening");
+    input.placeholder = "Listening...";
+  };
+  recognition.onend = () => {
+    listening = false;
+    micBtn.classList.remove("listening");
+    input.placeholder = "Talk to Kurama...";
+  };
+  recognition.onresult = (e) => {
+    input.value = e.results[0][0].transcript;
+    sendMessage(true);
+  };
+  recognition.onerror = (e) => {
+    addMessage("Mic problem: " + e.error, "kurama");
+  };
+}
+
 micBtn.addEventListener("click", () => {
-  micBtn.classList.toggle("listening");
+  if (!recognition) {
+    addMessage("Voice isn't supported in this browser. Try Chrome.", "kurama");
+    return;
+  }
+  if (listening) {
+    recognition.stop();
+  } else {
+    window.speechSynthesis.cancel();
+    recognition.start();
+  }
 });
