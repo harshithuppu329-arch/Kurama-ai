@@ -4,6 +4,8 @@ const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 const newBtn = document.getElementById("newchat");
 const modeSel = document.getElementById("mode");
+const photoBtn = document.getElementById("photo");
+const fileInput = document.getElementById("file");
 
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
@@ -35,6 +37,7 @@ function saveFacts() {
 
 let history = loadList(STORE_KEY); // this chat
 let facts = loadList(FACTS_KEY); // long-term notes
+let pendingImage = null; // photo waiting to be sent
 
 // ---- Mode ----
 try {
@@ -55,6 +58,17 @@ function addMessage(text, who) {
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
+}
+
+function addImageMessage(src) {
+  const div = document.createElement("div");
+  div.className = "msg user";
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = "Your photo";
+  div.appendChild(img);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 // Show the saved chat when the page opens
@@ -107,6 +121,49 @@ function handleMemoryCommand(text) {
   return null;
 }
 
+// ---- Photos: shrink to a small JPEG before sending ----
+function fileToJpeg(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      const dataUrl = c.toDataURL("image/jpeg", 0.8);
+      URL.revokeObjectURL(url);
+      resolve({ mime: "image/jpeg", data: dataUrl.split(",")[1], preview: dataUrl });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read that image"));
+    };
+    img.src = url;
+  });
+}
+
+photoBtn.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files && fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+  try {
+    pendingImage = await fileToJpeg(file, 1024);
+    addImageMessage(pendingImage.preview);
+    addMessage("Photo ready. Ask a question about it, or just tap send.", "kurama");
+    input.placeholder = "Ask about the photo...";
+    input.focus();
+  } catch (e) {
+    pendingImage = null;
+    addMessage("Photo problem: " + e.message, "kurama");
+  }
+});
+
 // ---- Kurama speaks (code blocks are skipped) ----
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
@@ -122,22 +179,30 @@ function speak(text) {
 }
 
 async function sendMessage(fromVoice) {
-  const text = input.value.trim();
-  if (!text) return;
+  let text = input.value.trim();
+  if (!text && !pendingImage) return;
+
+  const image = pendingImage;
+  if (!text) text = "Please look at this photo and explain it to me.";
 
   addMessage(text, "user");
   input.value = "";
 
   // Memory commands never go to the AI
-  const local = handleMemoryCommand(text);
+  const local = image ? null : handleMemoryCommand(text);
   if (local) {
     addMessage(local, "kurama");
     if (fromVoice) speak(local);
     return;
   }
 
+  pendingImage = null;
+  input.placeholder = "Talk to Kurama...";
   sendBtn.disabled = true;
-  const thinking = addMessage("Kurama is thinking...", "kurama");
+  const thinking = addMessage(
+    image ? "Kurama is looking at your photo..." : "Kurama is thinking...",
+    "kurama"
+  );
 
   try {
     const res = await fetch(WORKER_URL, {
@@ -148,6 +213,7 @@ async function sendMessage(fromVoice) {
         history,
         facts,
         mode: modeSel.value,
+        image: image ? { mime: image.mime, data: image.data } : undefined,
       }),
     });
     const data = await res.json();
@@ -155,7 +221,10 @@ async function sendMessage(fromVoice) {
       data.reply || "Error: " + (data.error || res.status);
 
     if (data.reply) {
-      history.push({ role: "user", text });
+      history.push({
+        role: "user",
+        text: image ? "[Sent a photo] " + text : text,
+      });
       history.push({ role: "model", text: data.reply });
       saveHistory();
       if (fromVoice) speak(data.reply);
@@ -177,8 +246,10 @@ input.addEventListener("keydown", (e) => {
 newBtn.addEventListener("click", () => {
   if (!confirm("Start a new chat? Your saved notes will be kept.")) return;
   history = [];
+  pendingImage = null;
   saveHistory();
   chat.innerHTML = "";
+  input.placeholder = "Talk to Kurama...";
   window.speechSynthesis.cancel();
   addMessage("New chat started. What are we doing today?", "kurama");
 });
@@ -202,7 +273,9 @@ if (SR) {
   recognition.onend = () => {
     listening = false;
     micBtn.classList.remove("listening");
-    input.placeholder = "Talk to Kurama...";
+    input.placeholder = pendingImage
+      ? "Ask about the photo..."
+      : "Talk to Kurama...";
   };
   recognition.onresult = (e) => {
     input.value = e.results[0][0].transcript;
