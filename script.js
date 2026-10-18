@@ -31,10 +31,10 @@ async function sendMessage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     });
-    const data = await res.json();
-    thinking.textContent = data.reply || "Kurama couldn't answer. Try again.";
+        const data = await res.json();
+    thinking.textContent = data.reply || ("Error: " + (data.error || res.status));
   } catch (e) {
-    thinking.textContent = "Can't reach Kurama's brain. Check your internet.";
+    thinking.textContent = "Connection problem: " + e.message;
   }
 
   sendBtn.disabled = false;
