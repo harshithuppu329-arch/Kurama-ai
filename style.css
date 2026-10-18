@@ -136,3 +136,12 @@ button {
   font-size: 14px;
   outline: none;
 }
+
+[hidden] { display: none !important; }
+
+.msg img {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  border-radius: 10px;
+}
