@@ -109,3 +109,17 @@ button {
   0%, 100% { box-shadow: 0 0 10px #ff5a1f; }
   50% { box-shadow: 0 0 28px #ffae00; }
 }
+
+.right { display: flex; align-items: center; gap: 10px; }
+
+#newchat {
+  width: auto;
+  height: auto;
+  padding: 6px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid #ff5a1f;
+  color: #ffb27a;
+  box-shadow: none;
+}
