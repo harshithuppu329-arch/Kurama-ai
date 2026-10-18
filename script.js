@@ -7,12 +7,14 @@ const newBtn = document.getElementById("newchat");
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
 const STORE_KEY = "kurama_history_v1";
+const FACTS_KEY = "kurama_facts_v1";
+const MAX_FACTS = 30;
 
-// Saved on this phone's browser only
-function loadHistory() {
+// ---- Saved on this phone's browser only ----
+function loadList(key) {
   try {
-    const h = JSON.parse(localStorage.getItem(STORE_KEY));
-    return Array.isArray(h) ? h : [];
+    const v = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(v) ? v : [];
   } catch (e) {
     return [];
   }
@@ -23,13 +25,20 @@ function saveHistory() {
     localStorage.setItem(STORE_KEY, JSON.stringify(history));
   } catch (e) {}
 }
+function saveFacts() {
+  try {
+    localStorage.setItem(FACTS_KEY, JSON.stringify(facts));
+  } catch (e) {}
+}
 
-let history = loadHistory();
+let history = loadList(STORE_KEY); // this chat
+let facts = loadList(FACTS_KEY); // long-term notes
 
 function addMessage(text, who) {
   const div = document.createElement("div");
   div.className = "msg " + who;
   div.textContent = text;
+  div.style.whiteSpace = "pre-line";
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
@@ -40,7 +49,52 @@ history.forEach((m) =>
   addMessage(m.text, m.role === "user" ? "user" : "kurama")
 );
 
-// Kurama speaks
+// ---- Memory commands, handled on the phone ----
+function handleMemoryCommand(text) {
+  const t = text.trim().replace(/[.!]+$/, "");
+
+  let m = t.match(/^remember(?:\s+that)?\s+(.+)/i);
+  if (m) {
+    const note = m[1].trim();
+    if (facts.length >= MAX_FACTS) {
+      return "My memory is full (" + MAX_FACTS + " notes). Say 'forget 1' to free space.";
+    }
+    facts.push(note.slice(0, 200));
+    saveFacts();
+    return "Saved. I'll remember: " + note;
+  }
+
+  if (/^(what do you remember|show (my )?memory|my memory)/i.test(t)) {
+    if (!facts.length) {
+      return "I don't have any notes yet. Say 'remember that ...' to add one.";
+    }
+    return (
+      "Here's what I remember:\n" +
+      facts.map((f, i) => i + 1 + ". " + f).join("\n")
+    );
+  }
+
+  if (/^forget\s+(everything|all)$/i.test(t)) {
+    facts = [];
+    saveFacts();
+    return "Done. I forgot all my notes.";
+  }
+
+  m = t.match(/^forget\s+(\d+)$/i);
+  if (m) {
+    const i = parseInt(m[1], 10) - 1;
+    if (i < 0 || i >= facts.length) {
+      return "I don't have a note with that number. Say 'what do you remember' to see the list.";
+    }
+    const gone = facts.splice(i, 1)[0];
+    saveFacts();
+    return "Forgot: " + gone;
+  }
+
+  return null;
+}
+
+// ---- Kurama speaks ----
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -58,15 +112,23 @@ async function sendMessage(fromVoice) {
 
   addMessage(text, "user");
   input.value = "";
-  sendBtn.disabled = true;
 
+  // Memory commands never go to the AI
+  const local = handleMemoryCommand(text);
+  if (local) {
+    addMessage(local, "kurama");
+    if (fromVoice) speak(local);
+    return;
+  }
+
+  sendBtn.disabled = true;
   const thinking = addMessage("Kurama is thinking...", "kurama");
 
   try {
     const res = await fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history }),
+      body: JSON.stringify({ message: text, history, facts }),
     });
     const data = await res.json();
     thinking.textContent =
@@ -91,9 +153,9 @@ input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage(false);
 });
 
-// New chat clears the saved conversation
+// New chat clears this conversation but keeps long-term notes
 newBtn.addEventListener("click", () => {
-  if (!confirm("Start a new chat? This clears the saved conversation.")) return;
+  if (!confirm("Start a new chat? Your saved notes will be kept.")) return;
   history = [];
   saveHistory();
   chat.innerHTML = "";
@@ -101,7 +163,7 @@ newBtn.addEventListener("click", () => {
   addMessage("New chat started. What are we doing today?", "kurama");
 });
 
-// You speak
+// ---- You speak ----
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let listening = false;
