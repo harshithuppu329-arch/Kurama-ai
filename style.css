@@ -123,3 +123,16 @@ button {
   color: #ffb27a;
   box-shadow: none;
 }
+
+.modebar { padding: 8px 16px; border-bottom: 1px solid #3a1a10; }
+
+#mode {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #4a2210;
+  background: #0d1220;
+  color: #ffb27a;
+  font-size: 14px;
+  outline: none;
+}
