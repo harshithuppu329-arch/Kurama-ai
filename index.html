@@ -8,18 +8,20 @@
 <meta name="theme-color" content="#070b16">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
+
 <header>
   <div class="logo">🦊 KURAMA AI</div>
   <div class="right">
-    <button id="newchat">+ New chat</button>
-    <div class="status"><span class="dot"></span> Online</div>
+    <button id="chats" type="button">☰ Chats</button>
+    <button id="newchat" type="button">+ New</button>
+    <div class="status"><span class="dot"></span></div>
   </div>
 </header>
 
-  <div class="modebar">
+<div class="modebar">
   <select id="mode">
     <option value="chat">💬 Chat mode</option>
     <option value="study">📚 Study mode</option>
@@ -29,20 +31,20 @@
     <option value="creative">🎨 Creative mode</option>
   </select>
   <button id="web" type="button">🌐 Web: off</button>
-  </div>
-  
+</div>
+
 <main id="chat">
   <div class="msg kurama">I'm awake, Harshith! What are we doing today?</div>
 </main>
 
 <footer>
   <input id="input" type="text" placeholder="Talk to Kurama...">
-  <button id="photo">📷</button>
+  <button id="photo" type="button">📷</button>
   <input id="file" type="file" accept="image/*" hidden>
-  <button id="send">➤</button>
-  <button id="mic">🎤</button>
+  <button id="send" type="button">➤</button>
+  <button id="mic" type="button">🎤</button>
 </footer>
-  
+
 <div id="panel" hidden>
   <div class="panel-head">
     <span>Your chats</span>
@@ -51,8 +53,8 @@
   <button id="panelnew" type="button" class="wide">+ New chat</button>
   <div id="chatlist"></div>
 </div>
-  
+
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
-<script src="script.js?v=15"></script>
+<script src="script.js?v=16"></script>
 </body>
 </html>
