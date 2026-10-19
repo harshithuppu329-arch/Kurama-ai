@@ -13,6 +13,9 @@ const webBtn = document.getElementById("web");
 const photoBtn = document.getElementById("photo");
 const fileInput = document.getElementById("file");
 
+// True only inside the native Android app (it provides window.KuramaNative)
+const NATIVE = typeof window.KuramaNative !== "undefined";
+
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
 const STORE_KEY = "kurama_history_v1"; // old single chat (migrated once)
@@ -386,7 +389,8 @@ const PHONE_HELP =
   "• call 9876543210 or call Mom\n" +
   "• text Mom I'm on my way\n" +
   "• save contact Mom 9876543210\n" +
-  "• contacts / delete contact Mom";
+  "• contacts / delete contact Mom\n" +
+  "• set alarm for 6:30 am (native app only)";
 
 function getContact(name) {
   const k = name.toLowerCase();
@@ -489,11 +493,37 @@ function handlePhoneAction(text) {
     };
   }
 
-  // alarm: Android doesn't let web apps set alarms
+  // alarm: only the native Android app can do this
   if (/^set (?:an )?alarm/i.test(t)) {
+    const am = t
+      .replace(/\./g, "")
+      .match(/^set (?:an )?alarm (?:for|at)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+    if (NATIVE && am) {
+      let h = parseInt(am[1], 10);
+      const mi = am[2] ? parseInt(am[2], 10) : 0;
+      const ap = am[3] ? am[3].toLowerCase() : "";
+      if (ap === "pm" && h < 12) h += 12;
+      if (ap === "am" && h === 12) h = 0;
+      if (h > 23 || mi > 59) {
+        return { text: "That time doesn't look right. Try 'set alarm for 6:30 am'." };
+      }
+      const pad = (n) => String(n).padStart(2, "0");
+      let ok = false;
+      try {
+        ok = window.KuramaNative.setAlarm(h, mi);
+      } catch (e) {}
+      return {
+        text: ok
+          ? "Asked your Clock app to set an alarm for " + pad(h) + ":" + pad(mi) + ". Please check the Clock app to confirm."
+          : "I couldn't reach your Clock app. Please set the alarm there.",
+      };
+    }
+    if (NATIVE) {
+      return { text: "Try 'set alarm for 6:30 am'." };
+    }
     return {
       text:
-        "I can't set alarms from the installed web app, because Android doesn't let websites do that. Please use your Clock app. A native Android version of Kurama could do it later.",
+        "Alarms only work in the native Kurama app, because Android doesn't let websites set them. Please use your Clock app for now.",
     };
   }
 
@@ -701,7 +731,7 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let listening = false;
 
-if (SR) {
+if (SR && !NATIVE) {
   recognition = new SR();
   recognition.lang = LANG;
   recognition.interimResults = false;
@@ -728,7 +758,34 @@ if (SR) {
   };
 }
 
+// Native app: the phone's own speech recognizer does the listening
+window.onNativeListening = (on) => {
+  listening = on;
+  micBtn.classList.toggle("listening", on);
+  input.placeholder = on
+    ? "Listening..."
+    : pendingImage
+    ? "Ask about the photo..."
+    : "Talk to Kurama...";
+};
+window.onNativeSpeech = (text) => {
+  input.value = text;
+  sendMessage(true);
+};
+window.onNativeSpeechError = (msg) => {
+  addMessage("Mic problem: " + msg, "kurama");
+};
+
 micBtn.addEventListener("click", () => {
+  if (NATIVE) {
+    if (listening) {
+      window.KuramaNative.stopListening();
+    } else {
+      window.speechSynthesis.cancel();
+      window.KuramaNative.startListening(LANG);
+    }
+    return;
+  }
   if (!recognition) {
     addMessage("Voice isn't supported in this browser. Try Chrome.", "kurama");
     return;
