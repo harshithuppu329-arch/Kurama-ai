@@ -3,6 +3,11 @@ const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 const newBtn = document.getElementById("newchat");
+const chatsBtn = document.getElementById("chats");
+const panel = document.getElementById("panel");
+const closePanelBtn = document.getElementById("closepanel");
+const panelNewBtn = document.getElementById("panelnew");
+const chatList = document.getElementById("chatlist");
 const modeSel = document.getElementById("mode");
 const webBtn = document.getElementById("web");
 const photoBtn = document.getElementById("photo");
@@ -10,13 +15,16 @@ const fileInput = document.getElementById("file");
 
 const WORKER_URL = "https://kurama-ai-backend.harshithuppu329.workers.dev";
 const LANG = "en-IN"; // speech language
-const STORE_KEY = "kurama_history_v1";
+const STORE_KEY = "kurama_history_v1"; // old single chat (migrated once)
+const CHATS_KEY = "kurama_chats_v1";
 const FACTS_KEY = "kurama_facts_v1";
 const MODE_KEY = "kurama_mode_v1";
 const WEB_KEY = "kurama_web_v1";
 const CONTACTS_KEY = "kurama_contacts_v1";
 const MAX_FACTS = 30;
 const MAX_CONTACTS = 50;
+const MAX_CHATS = 30;
+const GREETING = "I'm awake, Harshith! What are we doing today?";
 
 // ---- Saved on this phone's browser only ----
 function loadList(key) {
@@ -35,12 +43,6 @@ function loadObject(key) {
     return {};
   }
 }
-function saveHistory() {
-  try {
-    history = history.slice(-40);
-    localStorage.setItem(STORE_KEY, JSON.stringify(history));
-  } catch (e) {}
-}
 function saveFacts() {
   try {
     localStorage.setItem(FACTS_KEY, JSON.stringify(facts));
@@ -52,10 +54,69 @@ function saveContacts() {
   } catch (e) {}
 }
 
-let history = loadList(STORE_KEY); // this chat
+// ---- Several saved chats ----
+function newChatObj() {
+  return {
+    id: "c" + Date.now() + Math.random().toString(36).slice(2, 6),
+    title: "New chat",
+    updated: Date.now(),
+    history: [],
+  };
+}
+
+function titleFrom(h) {
+  const first = (h || []).find((m) => m && m.role === "user");
+  if (!first) return "";
+  return first.text.replace(/^\[Sent a photo\]\s*/, "").slice(0, 30);
+}
+
+function loadStore() {
+  try {
+    const s = JSON.parse(localStorage.getItem(CHATS_KEY));
+    if (s && Array.isArray(s.chats) && s.chats.length) {
+      if (!s.chats.find((c) => c.id === s.current)) s.current = s.chats[0].id;
+      return s;
+    }
+  } catch (e) {}
+  // First time: move the old single chat into the new list
+  const c = newChatObj();
+  c.history = loadList(STORE_KEY);
+  c.title = titleFrom(c.history) || "New chat";
+  return { current: c.id, chats: [c] };
+}
+
+function saveStore() {
+  try {
+    localStorage.setItem(CHATS_KEY, JSON.stringify(store));
+  } catch (e) {}
+}
+
+let store = loadStore();
+saveStore();
+
+function currentChat() {
+  return store.chats.find((c) => c.id === store.current);
+}
+
+let history = currentChat().history; // the open chat
 let facts = loadList(FACTS_KEY); // long-term notes
 let contacts = loadObject(CONTACTS_KEY); // name -> {n, p}
 let pendingImage = null; // photo waiting to be sent
+
+// Save one exchange into the chat it belongs to
+function recordExchange(chatId, userText, replyText) {
+  const target = store.chats.find((c) => c.id === chatId);
+  if (!target) return;
+  target.history.push({ role: "user", text: userText });
+  target.history.push({ role: "model", text: replyText });
+  target.history = target.history.slice(-40);
+  target.updated = Date.now();
+  if (target.title === "New chat") {
+    target.title = titleFrom(target.history) || "New chat";
+  }
+  if (target.id === store.current) history = target.history;
+  saveStore();
+}
 
 // ---- Mode ----
 try {
@@ -68,7 +129,8 @@ modeSel.addEventListener("change", () => {
   } catch (e) {}
 });
 
-// ---- Web search switch ----nlet webOn = false;
+// ---- Web search switch ----
+let webOn = false;
 try {
   webOn = localStorage.getItem(WEB_KEY) === "1";
 } catch (e) {}
@@ -140,10 +202,122 @@ function addImageMessage(src) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// Show the saved chat when the page opens
-history.forEach((m) =>
-  addMessage(m.text, m.role === "user" ? "user" : "kurama")
-);
+// Draw the open chat on screen
+function renderChat() {
+  chat.innerHTML = "";
+  addMessage(GREETING, "kurama");
+  history.forEach((m) =>
+    addMessage(m.text, m.role === "user" ? "user" : "kurama")
+  );
+}
+renderChat();
+
+// ---- Chat list panel ----
+function openChat(id) {
+  if (!store.chats.find((c) => c.id === id)) return;
+  store.current = id;
+  saveStore();
+  history = currentChat().history;
+  pendingImage = null;
+  input.placeholder = "Talk to Kurama...";
+  window.speechSynthesis.cancel();
+  renderChat();
+}
+
+function createChat() {
+  // Don't pile up empty chats: reuse the open one if it's still empty
+  if (!history.length) return true;
+  if (store.chats.length >= MAX_CHATS) {
+    alert("You have " + MAX_CHATS + " chats. Delete one first.");
+    return false;
+  }
+  const c = newChatObj();
+  store.chats.unshift(c);
+  store.current = c.id;
+  saveStore();
+  history = c.history;
+  pendingImage = null;
+  input.placeholder = "Talk to Kurama...";
+  window.speechSynthesis.cancel();
+  renderChat();
+  return true;
+}
+
+function renameChat(id) {
+  const c = store.chats.find((x) => x.id === id);
+  if (!c) return;
+  const name = prompt("Rename chat", c.title);
+  if (name && name.trim()) {
+    c.title = name.trim().slice(0, 40);
+    saveStore();
+    renderList();
+  }
+}
+
+function deleteChat(id) {
+  const c = store.chats.find((x) => x.id === id);
+  if (!c) return;
+  if (!confirm('Delete "' + c.title + '"? This cannot be undone.')) return;
+  store.chats = store.chats.filter((x) => x.id !== id);
+  if (!store.chats.length) {
+    const n = newChatObj();
+    store.chats.push(n);
+  }
+  const wasCurrent = id === store.current;
+  if (wasCurrent) {
+    store.current = store.chats[0].id;
+    history = currentChat().history;
+    renderChat();
+  }
+  saveStore();
+  renderList();
+}
+
+function renderList() {
+  chatList.innerHTML = "";
+  const sorted = store.chats.slice().sort((a, b) => b.updated - a.updated);
+  sorted.forEach((c) => {
+    const row = document.createElement("div");
+    row.className = "chat-row" + (c.id === store.current ? " current" : "");
+
+    const title = document.createElement("div");
+    title.className = "chat-title";
+    title.textContent = c.title;
+    title.addEventListener("click", () => {
+      openChat(c.id);
+      panel.hidden = true;
+    });
+
+    const ren = document.createElement("button");
+    ren.type = "button";
+    ren.className = "icon-btn";
+    ren.textContent = "✏️";
+    ren.addEventListener("click", () => renameChat(c.id));
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "icon-btn";
+    del.textContent = "🗑";
+    del.addEventListener("click", () => deleteChat(c.id));
+
+    row.appendChild(title);
+    row.appendChild(ren);
+    row.appendChild(del);
+    chatList.appendChild(row);
+  });
+}
+
+chatsBtn.addEventListener("click", () => {
+  renderList();
+  panel.hidden = false;
+});
+closePanelBtn.addEventListener("click", () => {
+  panel.hidden = true;
+});
+panelNewBtn.addEventListener("click", () => {
+  if (createChat()) panel.hidden = true;
+});
+newBtn.addEventListener("click", () => createChat());
 
 // ---- Memory commands, handled on the phone ----
 function handleMemoryCommand(text) {
@@ -212,8 +386,7 @@ const PHONE_HELP =
   "• call 9876543210 or call Mom\n" +
   "• text Mom I'm on my way\n" +
   "• save contact Mom 9876543210\n" +
-  "• contacts / delete contact Mom\n\n" +
-  "For answers from the web, turn on the 🌐 Web button and just ask your question.";
+  "• contacts / delete contact Mom";
 
 function getContact(name) {
   const k = name.toLowerCase();
@@ -362,7 +535,7 @@ function handlePhoneAction(text) {
   // open a site
   m = t.match(/^open\s+(.+)$/i);
   if (m) {
-    const name = m[1].trim().toLowerCase().replace(/^the\s+/, "").replace(/\s+app$/i, "");
+    const name = m[1].trim().toLowerCase().replace(/^the\s+/, "").replace(/\s+app$/, "");
     if (Object.prototype.hasOwnProperty.call(SITES, name)) {
       return { text: "Opening " + name + ".", label: "🚀 Open " + name, href: SITES[name], external: true };
     }
@@ -462,6 +635,7 @@ async function sendMessage(fromVoice) {
     return;
   }
 
+  const chatId = store.current; // reply is saved to THIS chat
   pendingImage = null;
   input.placeholder = "Talk to Kurama...";
   sendBtn.disabled = true;
@@ -499,16 +673,15 @@ async function sendMessage(fromVoice) {
       if (data.note) {
         thinking.textContent += "\n\n(" + data.note + ")";
       }
-      if (Array.isArray(data.sources) && data.sources.length) {
-        addSources(thinking, data.sources);
+      if (Array.isArray(data.sources) && data.sources.length) 
+       addSources(thinking, data.sources);
       }
-      history.push({
-        role: "user",
-        text: image ? "[Sent a photo] " + text : text,
-      });
-      history.push({ role: "model", text: data.reply });
-      saveHistory();
-      if (fromVoice) speak(data.reply);
+      recordExchange(
+        chatId,
+        image ? "[Sent a photo] " + text : text,
+        data.reply
+      );
+      if (fromVoice && chatId === store.current) speak(data.reply);
     }
   } catch (e) {
     thinking.textContent = "Connection problem: " + e.message;
@@ -521,18 +694,6 @@ async function sendMessage(fromVoice) {
 sendBtn.addEventListener("click", () => sendMessage(false));
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") sendMessage(false);
-});
-
-// New chat clears this conversation but keeps notes and contacts
-newBtn.addEventListener("click", () => {
-  if (!confirm("Start a new chat? Your saved notes and contacts will be kept.")) return;
-  history = [];
-  pendingImage = null;
-  saveHistory();
-  chat.innerHTML = "";
-  input.placeholder = "Talk to Kurama...";
-  window.speechSynthesis.cancel();
-  addMessage("New chat started. What are we doing today?", "kurama");
 });
 
 // ---- You speak ----
