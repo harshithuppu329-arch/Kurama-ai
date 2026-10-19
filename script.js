@@ -673,8 +673,8 @@ async function sendMessage(fromVoice) {
       if (data.note) {
         thinking.textContent += "\n\n(" + data.note + ")";
       }
-      if (Array.isArray(data.sources) && data.sources.length) 
-       addSources(thinking, data.sources);
+      if (Array.isArray(data.sources) && data.sources.length) {
+        addSources(thinking, data.sources);
       }
       recordExchange(
         chatId,

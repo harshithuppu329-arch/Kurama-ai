@@ -67,10 +67,11 @@ export default {
     }
 
     try {
-      const { message, history, facts, mode, image } = await request.json();
+      const { message, history, facts, mode, image, web } = await request.json();
       if (!message || typeof message !== "string" || message.length > 2000) {
         return reply({ error: "Invalid message" }, 400);
       }
+      const useWeb = web === true;
 
       // Optional photo (the page always sends a JPEG)
       let imagePart = null;
@@ -115,6 +116,12 @@ export default {
 
       let system = PERSONALITY;
       if (modePrompt) system += "\n\n" + modePrompt;
+      system += "\n\nToday's date is " + new Date().toISOString().slice(0, 10) + " (UTC).";
+      if (useWeb) {
+        system +=
+          "\n\nWeb search is on for this message. Use it for current facts " +
+          "and keep the answer short and clear.";
+      }
       if (notes) {
         system +=
           "\n\nNotes the user asked you to remember (use them naturally; " +
@@ -122,30 +129,76 @@ export default {
           notes;
       }
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents,
-          }),
+      const callGemini = (withSearch) => {
+        const body = {
+          systemInstruction: { parts: [{ text: system }] },
+          contents,
+        };
+        if (withSearch) body.tools = [{ google_search: {} }];
+        return fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": env.GEMINI_API_KEY,
+            },
+            body: JSON.stringify(body),
+          }
+        );
+      };
+
+      let res = await callGemini(useWeb);
+      let webFailed = false;
+      let webError = "";
+      if (!res.ok && useWeb) {
+        // Search not available: remember why, then answer without it
+        webFailed = true;
+        try {
+          const e = await res.json();
+          webError = (res.status + ": " + (e.error?.message || e.error?.status || "")).slice(0, 300);
+        } catch (_) {
+          webError = String(res.status);
         }
-      );
+        res = await callGemini(false);
+      }
 
       const data = await res.json();
       if (!res.ok) {
-        return reply({ error: "AI service error" }, 502);
+        const why = (data.error?.message || "").slice(0, 200);
+        return reply({ error: "AI service error " + res.status + " " + why }, 502);
       }
 
-      const text = (data.candidates?.[0]?.content?.parts || [])
+      const cand = data.candidates?.[0];
+      const text = (cand?.content?.parts || [])
         .map((p) => p.text || "")
         .join("");
-      return reply({ reply: text || "Kurama has no answer right now." });
+
+      // If the answer is empty, say why
+      let note = "";
+      if (!text) {
+        note =
+          "finishReason: " + (cand?.finishReason || "none") +
+          (data.promptFeedback?.blockReason
+            ? ", blocked: " + data.promptFeedback.blockReason
+            : "");
+      }
+
+      // Source links (only safe https links are passed on)
+      const chunks = cand?.groundingMetadata?.groundingChunks || [];
+      const sources = chunks
+        .map((c) => c && c.web)
+        .filter((w) => w && typeof w.uri === "string" && w.uri.startsWith("https://"))
+        .slice(0, 5)
+        .map((w) => ({ title: String(w.title || "Source").slice(0, 80), url: w.uri }));
+
+      return reply({
+        reply: text || "Kurama has no answer right now.",
+        sources,
+        webFailed,
+        webError,
+        note,
+      });
     } catch (e) {
       return reply({ error: "Something went wrong" }, 500);
     }

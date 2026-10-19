@@ -1,7 +1,10 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+[hidden] { display: none !important; }
+
 body {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: radial-gradient(circle at top, #1a0f1f, #070b16 70%);
@@ -9,23 +12,26 @@ body {
   font-family: Arial, sans-serif;
 }
 
+/* ---------- Header ---------- */
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
+  padding: 12px;
   border-bottom: 1px solid #3a1a10;
 }
 
 .logo {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: bold;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   color: #ff7a1a;
   text-shadow: 0 0 12px #ff4500;
+  white-space: nowrap;
 }
 
-.status { font-size: 13px; color: #ffb27a; }
+.right { display: flex; align-items: center; gap: 8px; }
+.status { display: flex; align-items: center; font-size: 13px; color: #ffb27a; }
 
 .dot {
   display: inline-block;
@@ -42,6 +48,28 @@ header {
   50% { opacity: 0.3; }
 }
 
+/* ---------- Mode bar ---------- */
+.modebar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #3a1a10;
+}
+
+#mode {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #4a2210;
+  background: #0d1220;
+  color: #ffb27a;
+  font-size: 14px;
+  outline: none;
+}
+
+/* ---------- Chat ---------- */
 #chat {
   flex: 1;
   overflow-y: auto;
@@ -71,6 +99,29 @@ header {
   background: linear-gradient(135deg, #ff7a1a, #d93a00);
 }
 
+.msg img {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  border-radius: 10px;
+}
+
+.action {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: #ff5a1f;
+  color: #fff;
+  font-size: 14px;
+  text-decoration: none;
+  box-shadow: 0 0 12px rgba(255, 90, 31, 0.6);
+}
+
+.sources { margin-top: 8px; font-size: 12px; color: #ffb27a; }
+.sources a { display: block; margin-top: 3px; color: #ffb27a; word-break: break-all; }
+
+/* ---------- Footer ---------- */
 footer {
   display: flex;
   gap: 8px;
@@ -95,6 +146,7 @@ input:focus { border-color: #ff7a1a; }
 button {
   width: 46px;
   height: 46px;
+  flex-shrink: 0;
   border: none;
   border-radius: 50%;
   background: #ff5a1f;
@@ -110,9 +162,8 @@ button {
   50% { box-shadow: 0 0 28px #ffae00; }
 }
 
-.right { display: flex; align-items: center; gap: 10px; }
-
-#newchat {
+/* ---------- Small header and mode buttons ---------- */
+#newchat, #chats {
   width: auto;
   height: auto;
   padding: 6px 10px;
@@ -124,47 +175,9 @@ button {
   box-shadow: none;
 }
 
-.modebar { padding: 8px 16px; border-bottom: 1px solid #3a1a10; }
-
-#mode {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid #4a2210;
-  background: #0d1220;
-  color: #ffb27a;
-  font-size: 14px;
-  outline: none;
-}
-
-[hidden] { display: none !important; }
-
-.msg img {
-  display: block;
-  width: 100%;
-  max-width: 220px;
-  border-radius: 10px;
-}
-
-.action {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 8px 14px;
-  border-radius: 16px;
-  background: #ff5a1f;
-  color: #fff;
-  font-size: 14px;
-  text-decoration: none;
-  box-shadow: 0 0 12px rgba(255, 90, 31, 0.6);
-}
-
-.modebar { display: flex; gap: 8px; align-items: center; }
-#mode { width: auto; flex: 1; min-width: 0; }
-
 #web {
   width: auto;
   height: auto;
-  flex-shrink: 0;
   padding: 10px 12px;
   border-radius: 12px;
   font-size: 13px;
@@ -180,26 +193,13 @@ button {
   box-shadow: 0 0 12px rgba(255, 90, 31, 0.6);
 }
 
-.sources { margin-top: 8px; font-size: 12px; color: #ffb27a; }
-.sources a { display: block; margin-top: 3px; color: #ffb27a; word-break: break-all; }
-header { padding: 12px 12px; }
-.logo { font-size: 17px; letter-spacing: 1px; }
-
-#chats {
-  width: auto;
-  height: auto;
-  padding: 6px 10px;
-  border-radius: 14px;
-  font-size: 12px;
-  background: transparent;
-  border: 1px solid #ff5a1f;
-  color: #ffb27a;
-  box-shadow: none;
-}
-
+/* ---------- Chat list panel ---------- */
 #panel {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -263,4 +263,4 @@ header { padding: 12px 12px; }
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  }
+}

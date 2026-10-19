@@ -1,4 +1,4 @@
-const CACHE = "kurama-v1";
+const CACHE = "kurama-v2";
 const FILES = [
   "./", "index.html", "style.css", "script.js",
   "manifest.json", "icon-192.png", "icon-512.png",
