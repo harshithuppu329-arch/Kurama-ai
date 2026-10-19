@@ -43,6 +43,15 @@
   <button id="mic">🎤</button>
 </footer>
   
+<div id="panel" hidden>
+  <div class="panel-head">
+    <span>Your chats</span>
+    <button id="closepanel" type="button" class="icon-btn">✕</button>
+  </div>
+  <button id="panelnew" type="button" class="wide">+ New chat</button>
+  <div id="chatlist"></div>
+</div>
+  
 <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 <script src="script.js?v=14"></script>
 </body>
