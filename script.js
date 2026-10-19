@@ -4,6 +4,7 @@ const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 const newBtn = document.getElementById("newchat");
 const modeSel = document.getElementById("mode");
+const webBtn = document.getElementById("web");
 const photoBtn = document.getElementById("photo");
 const fileInput = document.getElementById("file");
 
@@ -12,6 +13,7 @@ const LANG = "en-IN"; // speech language
 const STORE_KEY = "kurama_history_v1";
 const FACTS_KEY = "kurama_facts_v1";
 const MODE_KEY = "kurama_mode_v1";
+const WEB_KEY = "kurama_web_v1";
 const CONTACTS_KEY = "kurama_contacts_v1";
 const MAX_FACTS = 30;
 const MAX_CONTACTS = 50;
@@ -66,6 +68,24 @@ modeSel.addEventListener("change", () => {
   } catch (e) {}
 });
 
+// ---- Web search switch ----
+let webOn = false;
+try {
+  webOn = localStorage.getItem(WEB_KEY) === "1";
+} catch (e) {}
+function renderWeb() {
+  webBtn.textContent = webOn ? "🌐 Web: on" : "🌐 Web: off";
+  webBtn.classList.toggle("on", webOn);
+}
+renderWeb();
+webBtn.addEventListener("click", () => {
+  webOn = !webOn;
+  try {
+    localStorage.setItem(WEB_KEY, webOn ? "1" : "0");
+  } catch (e) {}
+  renderWeb();
+});
+
 function addMessage(text, who) {
   const div = document.createElement("div");
   div.className = "msg " + who;
@@ -74,6 +94,23 @@ function addMessage(text, who) {
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
+}
+
+// Source links under a web-searched answer
+function addSources(div, sources) {
+  const box = document.createElement("div");
+  box.className = "sources";
+  box.appendChild(document.createTextNode("Sources:"));
+  sources.forEach((s) => {
+    if (!s || typeof s.url !== "string" || !s.url.startsWith("https://")) return;
+    const a = document.createElement("a");
+    a.href = s.url;
+    a.textContent = "🔗 " + (s.title || "Source");
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    box.appendChild(a);
+  });
+  if (box.children.length) div.appendChild(box);
 }
 
 // A Kurama message with a button you tap to confirm the action
@@ -170,13 +207,14 @@ const SITES = {
 const PHONE_HELP =
   "Phone actions (you tap the button to confirm):\n" +
   "• open youtube / open gmail / open github.com\n" +
-  "• search black holes\n" +
+  "• search black holes (opens Google)\n" +
   "• search youtube for anime openings\n" +
   "• navigate to Charminar\n" +
   "• call 9876543210 or call Mom\n" +
   "• text Mom I'm on my way\n" +
   "• save contact Mom 9876543210\n" +
-  "• contacts / delete contact Mom";
+  "• contacts / delete contact Mom\n\n" +
+  "For answers from the web, turn on the 🌐 Web button and just ask your question.";
 
 function getContact(name) {
   const k = name.toLowerCase();
@@ -429,7 +467,11 @@ async function sendMessage(fromVoice) {
   input.placeholder = "Talk to Kurama...";
   sendBtn.disabled = true;
   const thinking = addMessage(
-    image ? "Kurama is looking at your photo..." : "Kurama is thinking...",
+    image
+      ? "Kurama is looking at your photo..."
+      : webOn
+      ? "Kurama is searching the web..."
+      : "Kurama is thinking...",
     "kurama"
   );
 
@@ -442,6 +484,7 @@ async function sendMessage(fromVoice) {
         history,
         facts,
         mode: modeSel.value,
+        web: webOn,
         image: image ? { mime: image.mime, data: image.data } : undefined,
       }),
     });
@@ -450,6 +493,13 @@ async function sendMessage(fromVoice) {
       data.reply || "Error: " + (data.error || res.status);
 
     if (data.reply) {
+      if (data.webFailed) {
+        thinking.textContent +=
+          "\n\n(Web search wasn't available right now, so I answered without it.)";
+      }
+      if (Array.isArray(data.sources) && data.sources.length) {
+        addSources(thinking, data.sources);
+      }
       history.push({
         role: "user",
         text: image ? "[Sent a photo] " + text : text,
