@@ -68,8 +68,7 @@ modeSel.addEventListener("change", () => {
   } catch (e) {}
 });
 
-// ---- Web search switch ----
-let webOn = false;
+// ---- Web search switch ----nlet webOn = false;
 try {
   webOn = localStorage.getItem(WEB_KEY) === "1";
 } catch (e) {}
@@ -363,7 +362,7 @@ function handlePhoneAction(text) {
   // open a site
   m = t.match(/^open\s+(.+)$/i);
   if (m) {
-    const name = m[1].trim().toLowerCase().replace(/^the\s+/, "").replace(/\s+app$/, "");
+    const name = m[1].trim().toLowerCase().replace(/^the\s+/, "").replace(/\s+app$/i, "");
     if (Object.prototype.hasOwnProperty.call(SITES, name)) {
       return { text: "Opening " + name + ".", label: "🚀 Open " + name, href: SITES[name], external: true };
     }
@@ -495,7 +494,7 @@ async function sendMessage(fromVoice) {
     if (data.reply) {
       if (data.webFailed) {
         thinking.textContent +=
-          "\n\n(Web search wasn't available: " + (data.webError || "unknown reason") + ")";
+          "\n\n(Web search isn't available on this key right now, so I answered without it.)";
       }
       if (data.note) {
         thinking.textContent += "\n\n(" + data.note + ")";
