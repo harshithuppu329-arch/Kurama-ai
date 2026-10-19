@@ -495,7 +495,10 @@ async function sendMessage(fromVoice) {
     if (data.reply) {
       if (data.webFailed) {
         thinking.textContent +=
-          "\n\n(Web search wasn't available right now, so I answered without it.)";
+          "\n\n(Web search wasn't available: " + (data.webError || "unknown reason") + ")";
+      }
+      if (data.note) {
+        thinking.textContent += "\n\n(" + data.note + ")";
       }
       if (Array.isArray(data.sources) && data.sources.length) {
         addSources(thinking, data.sources);
